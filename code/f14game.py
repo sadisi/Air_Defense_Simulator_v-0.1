@@ -192,7 +192,7 @@ while running:
 
     # Spawn missiles periodically
     spawn_timer += 1
-    if spawn_timer >= 30:  # Spawn a new missile every 30 frames (adjust as needed)
+    if spawn_timer >= 30:  # Spawn a new missile every 30 frames
         spawn_missile()
         spawn_timer = 0
 
