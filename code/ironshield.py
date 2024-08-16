@@ -13,20 +13,22 @@ pygame.display.set_caption("Air Defense Simulation Game")
 background = pygame.image.load("assets/images/skybg.jpg")
 background = pygame.transform.scale(background, (width, height))
 missile_image = pygame.image.load("assets/images/missiletb.png").convert_alpha()
-explosion_image = pygame.image.load("assets/images/explosion.png").convert_alpha()
+explosion_images = [pygame.image.load(f"assets/images/explosion{i}.png").convert_alpha() for i in range(1, 6)]
 plane_image = pygame.image.load("assets/images/f14.png").convert_alpha()
 engine_sound = pygame.mixer.Sound("assets/sounds/engine.mp3")
 explosion_sound = pygame.mixer.Sound("assets/sounds/explosion.mp3")
 missile_sound = pygame.mixer.Sound("assets/sounds/missile.mp3")  # Load missile sound
+fail_sound = pygame.mixer.Sound("assets/sounds/fail.mp3")  # Load fail sound
+background_music = pygame.mixer.music.load("assets/sounds/bgmusic.mp3")  # Background music
 
 # Resize images
-missile_width, missile_height = 80, 120
-plane_width, plane_height = 80, 80
-explosion_width, explosion_height = 250, 150  # Explosion is larger to cover the plane
+missile_width, missile_height = 100, 120
+plane_width, plane_height = 90, 90
+explosion_width, explosion_height = 150, 150  # Explosion is larger to cover the plane
 
 missile_image = pygame.transform.scale(missile_image, (missile_width, missile_height))
 plane_image = pygame.transform.scale(plane_image, (plane_width, plane_height))
-explosion_image = pygame.transform.scale(explosion_image, (explosion_width, explosion_height))
+explosion_images = [pygame.transform.scale(img, (explosion_width, explosion_height)) for img in explosion_images]
 
 # Game variables
 missiles = []
@@ -36,11 +38,12 @@ missile_speed = 5
 plane_speed = 7
 plane_speed_boost = 14
 explosion_timer = 0
+explosion_frame = 0
 explosion_position = None
 plane_rect = pygame.Rect(width // 2 - plane_width // 2, height - plane_height - 10, plane_width, plane_height)
 
-# Play engine sound continuously
-engine_sound.play(-1)
+# Play background music continuously
+pygame.mixer.music.play(-1)
 
 
 # Function to spawn a missile at a random position at the top
@@ -53,18 +56,20 @@ def spawn_missile():
 
 # Function to handle missile movement and collision with the plane
 def handle_missiles():
-    global score, cooldown, explosion_timer, explosion_position, missile_speed
+    global score, cooldown, explosion_timer, explosion_frame, explosion_position, missile_speed
     for missile in missiles[:]:
         missile[1] += missile_speed  # Move the missile down by increasing its y-coordinate
         missile_rect = pygame.Rect(missile[0], missile[1], missile_width, missile_height)
         if missile_rect.colliderect(plane_rect):  # Hit the plane
             missiles.remove(missile)
             explosion_sound.play()
+            fail_sound.play()  # Play fail sound on collision
             # Center the explosion image on the plane's position
             explosion_position = (
                 plane_rect.centerx - explosion_width // 2,
                 plane_rect.top - explosion_height // 2
             )
+            explosion_frame = 0
             explosion_timer = 30  # Show explosion for 30 frames
             cooldown = 100  # Set cooldown time
         elif missile[1] > height:  # Missed the plane, increase score
@@ -78,6 +83,7 @@ def move_plane():
     global plane_speed
     keys = pygame.key.get_pressed()
 
+    # Movement with acceleration for smoothness
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:  # Move left
         plane_rect.x -= plane_speed
     if keys[pygame.K_RIGHT] or keys[pygame.K_d]:  # Move right
@@ -160,8 +166,10 @@ while running:
 
     # Draw explosion if timer is active
     if explosion_timer > 0:
-        window.blit(explosion_image, explosion_position)
+        window.blit(explosion_images[explosion_frame], explosion_position)
         explosion_timer -= 1
+        if explosion_timer % 6 == 0:  # Change frame every 6 ticks
+            explosion_frame = (explosion_frame + 1) % len(explosion_images)
         if explosion_timer == 0:
             running = game_over_screen()
             if not running:
